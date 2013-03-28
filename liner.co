@@ -1,0 +1,34 @@
+"use strict"
+
+canvas = document.get-element-by-id \canvas
+{width, height} = canvas
+ctx = canvas.get-context \2d
+
+ctx.fill-rect 0 0 width, height
+
+texture = new Uint8Array width * height
+# alpha for the RGBA pixels, bytes
+for i til texture.length
+  texture[i] = Math.random! * 255
+
+{data: bytes}: data = ctx.get-image-data 0 0 width, height
+
+field = (x, y) -> [Math.sin(15*x+y), Math.cos(4*x+11*y)]
+
+for i til width
+  for j til height
+    x = j / height; y = i / width
+    avg = 0
+    for k til 10
+      avg += texture[(y * height * height + x * width) | 0]
+      [dx, dy] = field x, y
+      x += dx / (1 + Math.abs dx)
+      y += dy / (1 + Math.abs dy)
+      break unless -1 <= x < 1 and -1 <= y < 1
+
+    bytes[(i * height + j) * 4 + 3] = avg / k
+
+ctx.put-image-data data, 0 0
+
+
+
