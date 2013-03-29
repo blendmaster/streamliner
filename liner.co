@@ -3,16 +3,82 @@
 # CSCI 447 Scientific Visualization Spring 2013 -- Project 3
 "use strict"
 
-canvas = document.get-element-by-id \canvas
+$ = -> document.get-element-by-id it
+
+canvas = $ \canvas
 {width, height} = canvas
 ctx = canvas.get-context \2d
 
 ctx.fill-rect 0 0 width, height
 
-texture = ctx.create-image-data width, height
-# random alpha, RGBA pixels, bytes
-for i from 3 til texture.data.length by 4
-  texture.data[i] = (Math.random! * 255) | 0
+# support image textures
+use-noise = $ \noise
+  &add-event-listener \change !->
+    ctx.fill-rect 0 0 width, height
+    gen-noise!
+  if &checked
+    gen-noise!
+
+use-image = $ \image
+  &add-event-listener \change !->
+    if $ \file .files.0
+      change.call $ \file
+    else
+      $ \file .click!
+$ \file
+  &add-event-listener \change change = ->
+    if @files.0
+      use-image.checked = true
+      img = new Image
+      img.src = URL.create-object-URL that
+      img.onload = ->
+        ctx.clear-rect 0 0 width, height
+        ctx.draw-image img, 0 0 width, height
+
+  change.call &
+
+$ \clear-image .onclick = !-> $ \file .value = ''
+
+function gen-noise
+  image = ctx.get-image-data 0 0 width, height
+  # random alpha, RGBA pixels, bytes
+  for i from 3 til image.data.length by 4
+    image.data[i] = (Math.random! * 255) | 0
+
+  ctx.put-image-data image, 0 0
+
+rendering = false
+
+cancel = $ \cancel
+  &onclick = ->
+    if rendering
+      finish!
+btn = $ \render
+
+function finish
+  progress.hidden = true
+  btn.disabled = false
+  use-noise.disabled = false
+  use-image.disabled = false
+  $ \file .disabled = false
+  btn.text-content = \Render
+  cancel.hidden = true
+  worker.terminate!
+  rendering := false
+
+var worker
+
+<-! btn.add-event-listener \click
+
+rendering := true
+btn.text-content = \Rendering...
+btn.disabled = true
+cancel.hidden = false
+use-noise.disabled = true
+use-image.disabled = true
+$ \file .disabled = true
+
+texture = ctx.get-image-data 0, 0 width, height
 
 image = ctx.get-image-data 0 0 width, height
 
@@ -30,8 +96,7 @@ for i til height
 
 progress = document.get-element-by-id \progress
 
-worker = new Worker \render-worker.js
-
+worker := new Worker \render-worker.js
   # render once finished
   &onmessage = !(e) ->
     if e.data.type is \log
@@ -41,10 +106,11 @@ worker = new Worker \render-worker.js
     else
       # got image
       ctx.put-image-data e.data.image, 0 0
-      progress.hidden = true
+      finish!
 
   # start LIC
-  &post-message {image, texture, field-x, field-y, distance: 20}
+  distance = parse-int ($ \distance .value), 10 or 10
+  &post-message {image, texture, field-x, field-y, distance}
 
 progress.hidden = false
 
