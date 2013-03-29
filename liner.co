@@ -1,3 +1,6 @@
+# LIC renderer, as a Web Worker
+# Steven Ruppert
+# CSCI 447 Scientific Visualization Spring 2013 -- Project 3
 "use strict"
 
 canvas = document.get-element-by-id \canvas
@@ -11,69 +14,37 @@ texture = new Uint8Array width * height
 for i til texture.length
   texture[i] = (Math.random! * 255) | 0
 
-# binterp into texture
-function binterp x, y
-  # transform to [0, width] [0, height]
-  x = (x + 1) * width / 2
-  y = (y + 1) * height / 2
+image = ctx.get-image-data 0 0 width, height
 
-  x1 = Math.floor x
-  x2 = Math.ceil x
-  y1 = Math.floor y
-  y2 = Math.ceil y
-
-  if x1 is x
-    if y1 is y
-      # no interp needed
-      return texture[y * height + x] || 0
-    else
-      # linterp y
-      # a
-      #
-      # b
-      a = texture[y1 * height + x] || 0
-      b = texture[y2 * height + x] || 0
-
-      return ab = (y2 - y) * a + (y - y1) * b
-  else if y1 is y
-    # linterp x
-    # a  b
-    a = texture[y * height + x1] || 0
-    b = texture[y * height + x2] || 0
-
-    return ab = (x2 - x) * a + (x - x1) * b
-  else
-    # bilinterp
-    # a  b
-    #
-    # c  d
-    a = texture[y1 * height + x1] || 0
-    b = texture[y1 * height + x2] || 0
-    c = texture[y2 * height + x1] || 0
-    d = texture[y2 * height + x2] || 0
-
-    ab = (x2 - x) * a + (x - x1) * b
-    cd = (x2 - x) * c + (x - x1) * d
-
-    return (y2 - y) * ab + (y - y1) * cd
-
-{data: bytes}: data = ctx.get-image-data 0 0 width, height
-
+# create 2D vector field
+field-x = new Float32Array width * height
+field-y = new Float32Array width * height
 for i til height
   for j til width
     # transform to [-1, 1]
     x = j * 2 / width - 1
     y = i * 2 / height - 1
-    tex = 0
-    for k from 1 til 20
-      tex += binterp x, y
-      dx = Math.sin 5 * x + y
-      dy = Math.cos 2 * x + 6 * y
-      x += dx / (1 + Math.abs dx) / width
-      y += dy / (1 + Math.abs dy) / height
-      break unless -1 <= x <= 1 and -1 <= y <= 1
 
-    # set alpha to texture
-    bytes[(i * height + j) * 4 + 3] = tex / k
+    field-x[i * height + j] = Math.sin 5 * x + y
+    field-y[i * height + j] = Math.cos 2 * x + 6 * y
 
-ctx.put-image-data data, 0 0
+progress = document.get-element-by-id \progress
+
+worker = new Worker \render-worker.js
+
+  # render once finished
+  &onmessage = !(e) ->
+    if e.data.type is \log
+      console.log e.data.message
+    else if e.data.type is \progress
+      progress.value = e.data.value
+    else
+      # got image
+      ctx.put-image-data e.data.image, 0 0
+      progress.hidden = true
+
+  # start LIC
+  &post-message {image, texture, field-x, field-y}
+
+progress.hidden = false
+
