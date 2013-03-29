@@ -52,7 +52,8 @@ function binterp texture, x, y, width, height
 # image is an ImageData object
 # texture is an Uint8Array of size width * height
 # field-{x|y} are Float32Arrays of size width * height
-function lic image, texture, field-x, field-y
+# distance is how far to follow streamlines (smoothness)
+function lic image, texture, field-x, field-y, distance
   {width, height} = image
 
   bytes = image.data
@@ -64,8 +65,9 @@ function lic image, texture, field-x, field-y
       # transform to [-1, 1]
       x = j * 2 / width - 1
       y = i * 2 / height - 1
+
       tex = 0
-      for k from 1 til 20
+      for k from 1 til distance
         tex += binterp texture, x, y, width, height
 
         dx = binterp field-x, x, y, width, height
@@ -76,8 +78,23 @@ function lic image, texture, field-x, field-y
 
         break unless -1 <= x <= 1 and -1 <= y <= 1
 
+      # walk backwards too
+      x = j * 2 / width - 1
+      y = i * 2 / height - 1
+
+      for l from k til k + distance
+        tex += binterp texture, x, y, width, height
+
+        dx = binterp field-x, x, y, width, height
+        dy = binterp field-y, x, y, width, height
+
+        x -= dx / (1 + Math.abs dx) / width
+        y -= dy / (1 + Math.abs dy) / height
+
+        break unless -1 <= x <= 1 and -1 <= y <= 1
+
       # set alpha to texture
-      bytes[(i * height + j) * 4 + 3] = tex / k
+      bytes[(i * height + j) * 4 + 3] = tex / l
 
     p += width
     progress p / m
@@ -88,12 +105,12 @@ function progress
 function log
   post-message {type: \log message: it}
 
-@onmessage = !({{image, texture, field-x, field-y}: data}) ->
+@onmessage = !({{image, texture, field-x, field-y, distance}: data}) ->
   # lic mutates image
-  lic image, texture, field-x, field-y
+  lic image, texture, field-x, field-y, distance
 
-  # transfer ownership back to main thread
-  post-message {image, texture, field-x, field-y}
+  # transfer back to main thread
+  post-message {image}
 
 
 

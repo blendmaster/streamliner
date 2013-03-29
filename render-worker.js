@@ -29,8 +29,8 @@ function binterp(texture, x, y, width, height){
     return (y2 - y) * ab + (y - y1) * cd;
   }
 }
-function lic(image, texture, fieldX, fieldY){
-  var width, height, bytes, p, m, i, j, x, y, tex, k, dx, dy, results$ = [];
+function lic(image, texture, fieldX, fieldY, distance){
+  var width, height, bytes, p, m, i, j, x, y, tex, k, dx, dy, l, to$, results$ = [];
   width = image.width, height = image.height;
   bytes = image.data;
   p = 0;
@@ -40,7 +40,7 @@ function lic(image, texture, fieldX, fieldY){
       x = j * 2 / width - 1;
       y = i * 2 / height - 1;
       tex = 0;
-      for (k = 1; k < 20; ++k) {
+      for (k = 1; k < distance; ++k) {
         tex += binterp(texture, x, y, width, height);
         dx = binterp(fieldX, x, y, width, height);
         dy = binterp(fieldY, x, y, width, height);
@@ -50,7 +50,19 @@ function lic(image, texture, fieldX, fieldY){
           break;
         }
       }
-      bytes[(i * height + j) * 4 + 3] = tex / k;
+      x = j * 2 / width - 1;
+      y = i * 2 / height - 1;
+      for (l = k, to$ = k + distance; l < to$; ++l) {
+        tex += binterp(texture, x, y, width, height);
+        dx = binterp(fieldX, x, y, width, height);
+        dy = binterp(fieldY, x, y, width, height);
+        x -= dx / (1 + Math.abs(dx)) / width;
+        y -= dy / (1 + Math.abs(dy)) / height;
+        if (!((-1 <= x && x <= 1) && (-1 <= y && y <= 1))) {
+          break;
+        }
+      }
+      bytes[(i * height + j) * 4 + 3] = tex / l;
     }
     p += width;
     results$.push(progress(p / m));
@@ -70,13 +82,10 @@ function log(it){
   });
 }
 this.onmessage = function(arg$){
-  var data, image, texture, fieldX, fieldY;
-  data = arg$.data, image = data.image, texture = data.texture, fieldX = data.fieldX, fieldY = data.fieldY;
-  lic(image, texture, fieldX, fieldY);
+  var data, image, texture, fieldX, fieldY, distance;
+  data = arg$.data, image = data.image, texture = data.texture, fieldX = data.fieldX, fieldY = data.fieldY, distance = data.distance;
+  lic(image, texture, fieldX, fieldY, distance);
   postMessage({
-    image: image,
-    texture: texture,
-    fieldX: fieldX,
-    fieldY: fieldY
+    image: image
   });
 };

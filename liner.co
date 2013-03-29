@@ -44,7 +44,7 @@ worker = new Worker \render-worker.js
       progress.hidden = true
 
   # start LIC
-  &post-message {image, texture, field-x, field-y}
+  &post-message {image, texture, field-x, field-y, distance: 20}
 
 progress.hidden = false
 

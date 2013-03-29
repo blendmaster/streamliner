@@ -35,6 +35,7 @@ x0$.postMessage({
   image: image,
   texture: texture,
   fieldX: fieldX,
-  fieldY: fieldY
+  fieldY: fieldY,
+  distance: 20
 });
 progress.hidden = false;
