@@ -12,8 +12,18 @@
   <input type=file id=file><button id=clear-image>Clear Selection</button>
 </p>
 
+<p>
+  Vector Field: <br>
+  <label><input type="radio" name=field id=sine checked>Periodic function (preset, but it looks cool, I swear!)</label><br>
+  <label><input type="radio" name=field id=circle checked>Circular Flow (f(x,y) = (-y, x))</label><br>
+  <label><input type="radio" name=field id=ocean>Ocean Data (select files here): </label>
+    X data: <input type=file id=field-x>
+    Y data: <input type=file id=field-y>
+
+</p>
+
 <div>
-  <label>Trajectory Length (Affects Render Speed) <input id=distance type=number min=1 max=50 value=20></label>
+  <label>Trajectory Length (affects render speed) <input id=distance type=number min=1 max=50 value=20></label>
 </div>
 <div>
   <button id=render>Render</button>

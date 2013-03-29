@@ -123,8 +123,3 @@ function log
 
   # transfer back to main thread
   post-message {image}
-
-
-
-
-

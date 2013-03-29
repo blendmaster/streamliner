@@ -55,6 +55,7 @@ cancel = $ \cancel
       finish!
 btn = $ \render
 
+progress = $ \progress
 function finish
   progress.hidden = true
   btn.disabled = false
@@ -63,11 +64,12 @@ function finish
   $ \file .disabled = false
   btn.text-content = \Render
   cancel.hidden = true
-  worker.terminate!
+  worker?terminate!
   rendering := false
 
 var worker
-
+# firefox saves disabled state, annoying
+finish!
 <-! btn.add-event-listener \click
 
 rendering := true
@@ -77,40 +79,113 @@ cancel.hidden = false
 use-noise.disabled = true
 use-image.disabled = true
 $ \file .disabled = true
+progress.hidden = false
+progress.value = '' # indeterminate
 
 texture = ctx.get-image-data 0, 0 width, height
 
 image = ctx.get-image-data 0 0 width, height
 
+launch-worker = ->
+  console.log 'launching worker'
+  worker := new Worker \render-worker.js
+    # render once finished
+    &onmessage = !(e) ->
+      if e.data.type is \log
+        console.log e.data.message
+      else if e.data.type is \progress
+        progress.value = e.data.value
+      else
+        # got image
+        ctx.clear-rect 0 0, width, height
+        ctx.put-image-data e.data.image, 0 0
+        finish!
+
+    # start LIC
+    distance = parse-int ($ \distance .value), 10 or 10
+    &post-message {image, texture, field-x, field-y, distance}
+
 # create 2D vector field
 field-x = new Float32Array width * height
 field-y = new Float32Array width * height
-for i til height
-  for j til width
-    # transform to [-1, 1]
-    x = j * 2 / width - 1
-    y = i * 2 / height - 1
+if $ \sine .checked
+  for i til height
+    for j til width
+      # transform to [-1, 1]
+      x = j * 2 / width - 1
+      y = i * 2 / height - 1
 
-    field-x[i * height + j] = Math.sin 5 * x + y
-    field-y[i * height + j] = Math.cos 2 * x + 6 * y
+      field-x[i * height + j] = Math.sin 5 * x + y
+      field-y[i * height + j] = Math.cos 2 * x + 6 * y
+  launch-worker!
+else if $ \circle .checked
+  for i til height
+    for j til width
+      # transform to [-1, 1]
+      x = j * 2 / width - 1
+      y = i * 2 / height - 1
 
-progress = document.get-element-by-id \progress
+      field-x[i * height + j] = -y
+      field-y[i * height + j] = x
+  launch-worker!
+else
+  # ocean data
+  fx = $ \field-x .files.0
+  fy = $ \field-y .files.0
+  xloaded = yloaded = false
+  unless fx and fy
+    alert 'please select the ocean data files first!'
+    return finish!
 
-worker := new Worker \render-worker.js
-  # render once finished
-  &onmessage = !(e) ->
-    if e.data.type is \log
-      console.log e.data.message
-    else if e.data.type is \progress
-      progress.value = e.data.value
-    else
-      # got image
-      ctx.put-image-data e.data.image, 0 0
-      finish!
+  # these are huge files, I hope firefox doesn't choke
+  f = new FileReader
+  f.onload = ->
+    console.log 'read ocean x'
+    ocean-x = new Float32Array @result
 
-  # start LIC
-  distance = parse-int ($ \distance .value), 10 or 10
-  &post-message {image, texture, field-x, field-y, distance}
+    # reduce to width x height field, so I don't have to deal with the larger size
+    for i til height
+      for j til width
+        # ocean data is reversed for some reason
+        y = height - i
+        x = j
+        field-x[i * height + j] = ocean-x[x + y * 1440]
 
-progress.hidden = false
+    # null reference just in case of leaks
+    ocean-x = null
 
+    xloaded := true
+    if yloaded
+      # hack: zero out texture alpha when field is 0
+      for i til height
+        for j til width
+          if field-x[i * height + j] is 0 and field-y[i * height + j] is 0
+            texture.data[(i * height + j) * 4 + 3] = 0
+
+      launch-worker!
+  f.read-as-array-buffer fx
+
+  f = new FileReader
+  f.onload = ->
+    console.log 'read ocean y'
+    ocean-y = new Float32Array @result
+
+    # reduce to width x height field
+    for i til height
+      for j til width
+        y = height - i
+        x = j
+        field-y[i * height + j] = ocean-y[x + y * 1440]
+
+    # null reference just in case
+    ocean-y = null
+
+    yloaded := true
+    if xloaded
+      # hack: zero out texture alpha when field is 0
+      for i til height
+        for j til width
+          if field-x[i * height + j] is 0 and field-y[i * height + j] is 0
+            texture.data[(i * height + j) * 4 + 3] = 0
+      launch-worker!
+  f.read-as-array-buffer fy
