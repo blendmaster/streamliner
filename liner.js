@@ -4,9 +4,9 @@ canvas = document.getElementById('canvas');
 width = canvas.width, height = canvas.height;
 ctx = canvas.getContext('2d');
 ctx.fillRect(0, 0, width, height);
-texture = new Uint8Array(width * height);
-for (i = 0, to$ = texture.length; i < to$; ++i) {
-  texture[i] = Math.random() * 255 | 0;
+texture = ctx.createImageData(width, height);
+for (i = 3, to$ = texture.data.length; i < to$; i += 4) {
+  texture.data[i] = Math.random() * 255 | 0;
 }
 image = ctx.getImageData(0, 0, width, height);
 fieldX = new Float32Array(width * height);

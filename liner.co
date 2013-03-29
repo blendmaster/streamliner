@@ -9,10 +9,10 @@ ctx = canvas.get-context \2d
 
 ctx.fill-rect 0 0 width, height
 
-texture = new Uint8Array width * height
-# alpha for the RGBA pixels, bytes
-for i til texture.length
-  texture[i] = (Math.random! * 255) | 0
+texture = ctx.create-image-data width, height
+# random alpha, RGBA pixels, bytes
+for i from 3 til texture.data.length by 4
+  texture.data[i] = (Math.random! * 255) | 0
 
 image = ctx.get-image-data 0 0 width, height
 

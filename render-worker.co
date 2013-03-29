@@ -3,8 +3,10 @@
 # CSCI 447 Scientific Visualization Spring 2013 -- Project 3
 "use strict"
 
-# binterp into a texture
-function binterp texture, x, y, width, height
+# binterp into a 2d array
+# data-length and offset control indexing, so binterp can be used with
+# byte-indexed RGBA imageData arrays
+function binterp texture, x, y, width, height, data-length = 1, offset = 0
   # transform to [0, width] [0, height]
   x = (x + 1) * width / 2
   y = (y + 1) * height / 2
@@ -17,21 +19,21 @@ function binterp texture, x, y, width, height
   if x1 is x
     if y1 is y
       # no interp needed
-      return texture[y * height + x] || 0
+      return texture[(y * height + x) * data-length + offset] || 0
     else
       # linterp y
       # a
       #
       # b
-      a = texture[y1 * height + x] || 0
-      b = texture[y2 * height + x] || 0
+      a = texture[(y1 * height + x) * data-length + offset] || 0
+      b = texture[(y2 * height + x) * data-length + offset] || 0
 
       return ab = (y2 - y) * a + (y - y1) * b
   else if y1 is y
     # linterp x
     # a  b
-    a = texture[y * height + x1] || 0
-    b = texture[y * height + x2] || 0
+    a = texture[(y * height + x1) * data-length + offset] || 0
+    b = texture[(y * height + x2) * data-length + offset] || 0
 
     return ab = (x2 - x) * a + (x - x1) * b
   else
@@ -39,10 +41,10 @@ function binterp texture, x, y, width, height
     # a  b
     #
     # c  d
-    a = texture[y1 * height + x1] || 0
-    b = texture[y1 * height + x2] || 0
-    c = texture[y2 * height + x1] || 0
-    d = texture[y2 * height + x2] || 0
+    a = texture[(y1 * height + x1) * data-length + offset] || 0
+    b = texture[(y1 * height + x2) * data-length + offset] || 0
+    c = texture[(y2 * height + x1) * data-length + offset] || 0
+    d = texture[(y2 * height + x2) * data-length + offset] || 0
 
     ab = (x2 - x) * a + (x - x1) * b
     cd = (x2 - x) * c + (x - x1) * d
@@ -50,13 +52,14 @@ function binterp texture, x, y, width, height
     return (y2 - y) * ab + (y - y1) * cd
 
 # image is an ImageData object
-# texture is an Uint8Array of size width * height
+# texture is an ImageData object
 # field-{x|y} are Float32Arrays of size width * height
 # distance is how far to follow streamlines (smoothness)
 function lic image, texture, field-x, field-y, distance
   {width, height} = image
 
   bytes = image.data
+  tex-bytes = texture.data
 
   p = 0
   m = height * width
@@ -66,9 +69,12 @@ function lic image, texture, field-x, field-y, distance
       x = j * 2 / width - 1
       y = i * 2 / height - 1
 
-      tex = 0
+      tex-r = tex-g = tex-b = tex-a = 0
       for k from 1 til distance
-        tex += binterp texture, x, y, width, height
+        tex-r += binterp tex-bytes, x, y, width, height, 4 0
+        tex-g += binterp tex-bytes, x, y, width, height, 4 1
+        tex-b += binterp tex-bytes, x, y, width, height, 4 2
+        tex-a += binterp tex-bytes, x, y, width, height, 4 3
 
         dx = binterp field-x, x, y, width, height
         dy = binterp field-y, x, y, width, height
@@ -83,7 +89,10 @@ function lic image, texture, field-x, field-y, distance
       y = i * 2 / height - 1
 
       for l from k til k + distance
-        tex += binterp texture, x, y, width, height
+        tex-r += binterp tex-bytes, x, y, width, height, 4 0
+        tex-g += binterp tex-bytes, x, y, width, height, 4 1
+        tex-b += binterp tex-bytes, x, y, width, height, 4 2
+        tex-a += binterp tex-bytes, x, y, width, height, 4 3
 
         dx = binterp field-x, x, y, width, height
         dy = binterp field-y, x, y, width, height
@@ -93,8 +102,11 @@ function lic image, texture, field-x, field-y, distance
 
         break unless -1 <= x <= 1 and -1 <= y <= 1
 
-      # set alpha to texture
-      bytes[(i * height + j) * 4 + 3] = tex / l
+      # set image to avg
+      bytes[(i * height + j) * 4    ] = tex-r / l
+      bytes[(i * height + j) * 4 + 1] = tex-g / l
+      bytes[(i * height + j) * 4 + 2] = tex-b / l
+      bytes[(i * height + j) * 4 + 3] = tex-a / l
 
     p += width
     progress p / m
